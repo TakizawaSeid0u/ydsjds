@@ -1,0 +1,54 @@
+import tensorflow as tf
+import numpy as np
+import time
+
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+x_train = x_train.reshape(-1, 784).astype("float32") / 255.0
+x_test = x_test.reshape(-1, 784).astype("float32") / 255.0
+
+def build_auto_model():
+    model = tf.keras.Sequential([
+        tf.keras.layers.Dense(128, activation="relu", input_shape=(784,)),
+        tf.keras.layers.Dense(10, activation="softmax")
+    ])
+    model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+    return model
+
+class ManualInitLayer(tf.keras.layers.Layer):
+    def __init__(self, units, custom_weights, activation=None):
+        super().__init__()
+        self.units = units
+        self.custom_weights = custom_weights
+        self.activation = tf.keras.activations.get(activation)
+
+    def build(self, input_shape):
+        self.w = tf.Variable(self.custom_weights, trainable=True, dtype=tf.float32)
+        self.b = tf.Variable(tf.zeros([self.units]), trainable=True)
+
+    def call(self, inputs):
+        return self.activation(tf.matmul(inputs, self.w) + self.b)
+
+def build_manual_model(custom_matrix):
+    model = tf.keras.Sequential([
+        ManualInitLayer(128, custom_matrix, activation="relu"),
+        tf.keras.layers.Dense(10, activation="softmax")
+    ])
+    model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+    return model
+
+auto_model = build_auto_model()
+start = time.time()
+history_auto = auto_model.fit(x_train, y_train, epochs=3, batch_size=128, verbose=0)
+end = time.time()
+print("Автоматическая инициализация:", end - start, "секунд")
+
+custom_matrix = np.linalg.qr(np.random.randn(784, 128))[0].astype("float32") 
+manual_model = build_manual_model(custom_matrix)
+start = time.time()
+history_manual = manual_model.fit(x_train, y_train, epochs=3, batch_size=128, verbose=0)
+end = time.time()
+print("Ручная инициализация:", end - start, "секунд")
+
+scaled_matrix = (np.random.randn(784, 128) * 0.01).astype("float32")
+scaled_model = build_manual_model(scaled_matrix)
+history_scaled = scaled_model.fit(x_train, y_train, epochs=3, batch_size=128, verbose=0)
